@@ -1,0 +1,168 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Mock API Server — GraphQL Schema
+#
+# HTTP endpoint  : POST /graphql          (JSON body with query/variables)
+# GraphiQL IDE   : GET  /graphiql         (browser-based playground)
+# Subscriptions  : ws://localhost:8080/graphql-ws   (plain WS)
+#                  wss://localhost:8443/graphql-ws   (secure WSS)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Scalars ───────────────────────────────────────────────────────────────────
+# Built-in: String, Int, Boolean, Float, ID
+
+# ── Response types ────────────────────────────────────────────────────────────
+
+"""
+A mock API response of a specific size and format.
+"""
+type MockResponse {
+    "Unique request identifier"
+    requestId: String!
+
+    "HTTP-equivalent method label (GET, POST, PUT, DELETE)"
+    method: String!
+
+    "Resource name (e.g. orders, users, products)"
+    resource: String!
+
+    "Target size in kilobytes"
+    sizeKb: Int!
+
+    "Response format: json or xml"
+    format: String!
+
+    "Exact byte length of the payload"
+    byteLength: Int!
+
+    "ISO-8601 timestamp of generation"
+    timestamp: String!
+
+    "The actual mock payload (JSON string or XML string)"
+    payload: String!
+}
+
+"""
+Server health and version info.
+"""
+type HealthResponse {
+    status: String!
+    server: String!
+    timestamp: String!
+}
+
+"""
+Catalogue of all available options and endpoint URLs.
+"""
+type ServerInfo {
+    server: String!
+    validSizes: [Int!]!
+    formats: [String!]!
+    methods: [String!]!
+    httpEndpoint: String!
+    graphiqlUrl: String!
+    wsSubscriptionUrl: String!
+    wssSubscriptionUrl: String!
+}
+
+"""
+Result of a mutation (create / update / delete).
+"""
+type MutationResult {
+    success: Boolean!
+    operation: String!
+    affectedId: String
+    response: MockResponse!
+}
+
+# ── Queries ───────────────────────────────────────────────────────────────────
+type Query {
+    """
+    Fetch a mock payload.
+
+    Arguments
+    ─────────
+    resource  : logical resource name (orders, users, products, …)
+    size      : payload size in KB — one of 1,2,3,4,5,6,7,8,9,10,15,20
+    format    : 'json' (default) or 'xml'
+    method    : HTTP method label to embed in the response (default GET)
+
+    Example
+    ───────
+    query {
+      mock(resource: "orders", size: 5, format: "json") {
+        sizeKb byteLength payload
+      }
+    }
+    """
+    mock(
+        resource: String!
+        size: Int = 1
+        format: String = "json"
+        method: String = "GET"
+    ): MockResponse!
+
+    "Health probe — equivalent to GET /health"
+    health: HealthResponse!
+
+    "Server capabilities and endpoint reference"
+    info: ServerInfo!
+}
+
+# ── Mutations ─────────────────────────────────────────────────────────────────
+type Mutation {
+    """
+    Simulate creating a resource (POST).
+    Returns a mock response of the requested size.
+    """
+    create(
+        resource: String!
+        size: Int = 1
+        format: String = "json"
+    ): MutationResult!
+
+    """
+    Simulate updating a resource (PUT).
+    """
+    update(
+        resource: String!
+        id: String!
+        size: Int = 1
+        format: String = "json"
+    ): MutationResult!
+
+    """
+    Simulate deleting a resource (DELETE).
+    """
+    delete(
+        resource: String!
+        id: String!
+        size: Int = 1
+        format: String = "json"
+    ): MutationResult!
+}
+
+# ── Subscriptions ─────────────────────────────────────────────────────────────
+type Subscription {
+    """
+    Stream mock responses at a configurable interval.
+
+    Connect via WebSocket:
+      ws://localhost:8080/graphql-ws     (WS  — plain)
+      wss://localhost:8443/graphql-ws    (WSS — TLS)
+
+    Example subscription:
+    subscription {
+      mockStream(resource: "events", size: 3, format: "json", intervalMs: 2000) {
+        requestId sizeKb byteLength timestamp payload
+      }
+    }
+    """
+    mockStream(
+        resource: String!
+        size: Int = 1
+        format: String = "json"
+        method: String = "GET"
+        "Milliseconds between each emitted event (min 500, default 1000)"
+        intervalMs: Int = 1000
+    ): MockResponse!
+}
