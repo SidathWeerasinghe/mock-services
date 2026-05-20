@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Mock API Server – Test Console</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:       #0d1117; --surface: #161b22; --surface2: #21262d;
+    --border:   #30363d; --accent:  #58a6ff; --accent2: #3fb950;
+    --warn:     #f85149; --yellow:  #d29922; --purple: #bc8cff;
+    --text:     #e6edf3; --muted:   #8b949e; --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; }
+
+  header { background: linear-gradient(135deg,#1f2a3c,#0d1117); border-bottom: 1px solid var(--border); padding: 20px 32px; display: flex; align-items: center; gap: 16px; }
+  header .logo { width: 40px; height: 40px; background: linear-gradient(135deg,var(--accent),var(--purple)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+  header h1 { font-size: 20px; font-weight: 700; }
+  header p  { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .tabs { display: flex; gap: 4px; padding: 16px 32px 0; border-bottom: 1px solid var(--border); }
+  .tab { padding: 10px 20px; border-radius: 8px 8px 0 0; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--muted); border: 1px solid transparent; border-bottom: none; transition: all .2s; }
+  .tab.active { background: var(--surface); border-color: var(--border); color: var(--text); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .panel { display: none; padding: 24px 32px; }
+  .panel.active { display: block; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media(max-width:860px){ .grid2 { grid-template-columns:1fr; } }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 16px; color: var(--accent); }
+
+  label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; margin-top: 12px; }
+  label:first-child { margin-top: 0; }
+  select, input[type=text] {
+    width: 100%; padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-size: 13px; outline: none; font-family: inherit;
+    transition: border-color .2s;
+  }
+  select:focus, input[type=text]:focus { border-color: var(--accent); }
+  option { background: var(--surface2); }
+
+  .btn { padding: 9px 18px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s; font-family: inherit; }
+  .btn-primary { background: var(--accent); color: #0d1117; }
+  .btn-primary:hover { background: #79c0ff; }
+  .btn-success { background: var(--accent2); color: #0d1117; }
+  .btn-success:hover { background: #56d364; }
+  .btn-danger  { background: var(--warn); color: #fff; }
+  .btn-danger:hover { filter: brightness(1.15); }
+  .btn-warn    { background: var(--yellow); color: #0d1117; }
+  .btn-warn:hover { filter: brightness(1.15); }
+  .btn-purple  { background: var(--purple); color: #0d1117; }
+  .btn-purple:hover { filter: brightness(1.15); }
+
+  .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+
+  .output-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 14px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.6; max-height: 380px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #e6edf3; position: relative; }
+  .status-bar { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-green  { background: rgba(63,185,80,.2);  color: var(--accent2); border: 1px solid rgba(63,185,80,.4); }
+  .badge-blue   { background: rgba(88,166,255,.2); color: var(--accent);  border: 1px solid rgba(88,166,255,.4); }
+  .badge-red    { background: rgba(248,81,73,.2);  color: var(--warn);    border: 1px solid rgba(248,81,73,.4); }
+  .badge-yellow { background: rgba(210,153,34,.2); color: var(--yellow);  border: 1px solid rgba(210,153,34,.4); }
+
+  .ws-log { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; line-height: 1.7; max-height: 420px; overflow-y: auto; }
+  .ws-log .entry { padding: 3px 0; border-bottom: 1px solid rgba(48,54,61,.5); }
+  .ws-log .ts   { color: var(--muted); margin-right: 8px; }
+  .ws-log .dir-send { color: var(--yellow); }
+  .ws-log .dir-recv { color: var(--accent2); }
+  .ws-log .dir-sys  { color: var(--purple); }
+  .ws-log .dir-err  { color: var(--warn); }
+
+  .endpoints-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .endpoints-table th { background: var(--surface2); padding: 10px 14px; text-align: left; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .endpoints-table td { padding: 9px 14px; border-bottom: 1px solid var(--border); }
+  .endpoints-table tr:last-child td { border-bottom: none; }
+  .endpoints-table code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .method { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+  .m-get    { background: rgba(63,185,80,.15);  color: var(--accent2); }
+  .m-post   { background: rgba(88,166,255,.15); color: var(--accent); }
+  .m-put    { background: rgba(210,153,34,.15); color: var(--yellow); }
+  .m-delete { background: rgba(248,81,73,.15);  color: var(--warn); }
+  .m-ws     { background: rgba(188,140,255,.15);color: var(--purple); }
+
+  .size-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 3px 10px; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚡</div>
+  <div>
+    <h1>Mock API Server</h1>
+    <p>REST · WebSocket (WS/WSS) · GraphQL (Query/Mutation/Subscription) · JSON / XML / Text / HTML · 1–20 KB</p>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('rest')"     id="tab-rest">REST API</div>
+  <div class="tab"        onclick="switchTab('stomp')"    id="tab-stomp">WebSocket STOMP</div>
+  <div class="tab"        onclick="switchTab('rawws')"    id="tab-rawws">Raw WebSocket</div>
+  <div class="tab"        onclick="switchTab('graphql')"  id="tab-graphql">GraphQL</div>
+  <div class="tab"        onclick="switchTab('tls')"      id="tab-tls">🔒 TLS Testing</div>
+  <div class="tab"        onclick="switchTab('docs')"     id="tab-docs">Endpoints</div>
+</div>
+
+<!-- ═══════════════════ REST PANEL ═══════════════════ -->
+<div class="panel active" id="panel-rest">
+  <div class="grid2">
+    <div class="card">
+      <h3>⚙ Request Builder</h3>
+      <label>HTTP Method</label>
+      <select id="rest-method">
+        <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option>
+      </select>
+      <label>Resource</label>
+      <input type="text" id="rest-resource" value="orders" placeholder="e.g. orders, users, products"/>
+      <label>ID (for PUT / DELETE)</label>
+      <input type="text" id="rest-id" value="42" placeholder="resource id"/>
+      <label>Response Size (KB)</label>
+      <select id="rest-size">
+        <option>1</option><option>2</option><option>3</option><option>4</option>
+        <option value="5" selected>5</option><option>6</option><option>7</option>
+        <option>8</option><option>9</option><option>10</option><option>15</option><option>20</option>
+      </select>
+      <label>Format</label>
+      <select id="rest-format"><option value="json">JSON</option><option value="xml">XML</option><option value="text">Plain Text</option><option value="html">HTML</option></select>
+
+      <div class="btn-group">
+        <button class="btn btn-primary"  onclick="sendRest('GET')">GET</button>
+        <button class="btn btn-success"  onclick="sendRest('POST')">POST</button>
+        <button class="btn btn-warn"     onclick="sendRest('PUT')">PUT</button>
+        <button class="btn btn-danger"   onclick="sendRest('DELETE')">DELETE</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📨 Response</h3>
+      <div class="status-bar" id="rest-status-bar"></div>
+      <div class="output-box" id="rest-output">Response will appear here…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ STOMP PANEL ═══════════════════ -->
+<div class="panel" id="panel-stomp">
+  <div class="grid2">
+    <div class="card">
+      <h3>🔌 STOMP Connection</h3>
+      <label>WebSocket URL</label>
+      <input type="text" id="stomp-url" value="http://localhost:8080/ws"/>
+      <div class="btn-group">
+        <button class="btn btn-success" onclick="stompConnect()">Connect</button>
+        <button class="btn btn-danger"  onclick="stompDisconnect()">Disconnect</button>
+      </div>
+      <div style="margin-top:16px; padding:10px; background:var(--surface2); border-radius:6px; font-size:12px; color:var(--muted);">
+        📌 SockJS endpoint — connects to <code>/ws</code> and subscribes to <code>/topic/response</code>
+      </div>
+
+      <h3 style="margin-top:20px;">📤 Send Message</h3>
+      <label>Resource</label>
+      <input type="text" id="stomp-resource" value="users"/>
+      <label>Size (KB)</label>
+      <select id="stomp-size">
+        <option>1</option><option>2</option><option>3</option>
+        <option value="5" selected>5</option><option>10</option><option>15</option><option>20</option>
+      </select>
+      <label>Format</label>
+      <select id="stomp-format"><option value="json">JSON</option><option value="xml">XML</option><option value="text">Plain Text</option><option value="html">HTML</option></select>
+      <label>Method</label>
+      <select id="stomp-method"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="stompSend()">Send to /app/mock</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📋 Message Log</h3>
+      <div class="ws-log" id="stomp-log"><div class="entry"><span class="ts">--:--:--</span><span class="dir-sys">Waiting for connection…</span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ RAW WS PANEL ═══════════════════ -->
+<div class="panel" id="panel-rawws">
+  <div class="grid2">
+    <div class="card">
+      <h3>🔌 Raw WebSocket Connection</h3>
+      <label>WebSocket URL (ws:// or wss://)</label>
+      <input type="text" id="raw-url" value="ws://localhost:8080/raw-ws"/>
+      <div class="btn-group">
+        <button class="btn btn-success" onclick="rawConnect()">Connect</button>
+        <button class="btn btn-danger"  onclick="rawDisconnect()">Disconnect</button>
+      </div>
+      <div id="raw-conn-status" style="margin-top:10px; font-size:12px; color:var(--muted);">● Disconnected</div>
+
+      <h3 style="margin-top:20px;">📤 Send Request</h3>
+      <label>Resource</label>
+      <input type="text" id="raw-resource" value="products"/>
+      <label>Size (KB)</label>
+      <select id="raw-size">
+        <option>1</option><option>2</option><option>3</option>
+        <option value="5" selected>5</option><option>10</option><option>15</option><option>20</option>
+      </select>
+      <label>Format</label>
+      <select id="raw-format"><option value="json">JSON</option><option value="xml">XML</option><option value="text">Plain Text</option><option value="html">HTML</option></select>
+      <label>Method</label>
+      <select id="raw-method"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="rawSend()">Send Frame</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📋 Frame Log</h3>
+      <div class="ws-log" id="raw-log"><div class="entry"><span class="ts">--:--:--</span><span class="dir-sys">Waiting for connection…</span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ GRAPHQL PANEL ═══════════════════ -->
+<div class="panel" id="panel-graphql">
+  <div class="grid2">
+    <!-- Left column: Query / Mutation builder -->
+    <div class="card">
+      <h3>⚡ GraphQL Query / Mutation</h3>
+      <label>Operation Type</label>
+      <select id="gql-op-type" onchange="gqlTemplateChange()">
+        <option value="query-mock">Query — mock()</option>
+        <option value="query-health">Query — health()</option>
+        <option value="query-info">Query — info()</option>
+        <option value="mutation-create">Mutation — create()</option>
+        <option value="mutation-update">Mutation — update()</option>
+        <option value="mutation-delete">Mutation — delete()</option>
+      </select>
+      <label>GraphQL Document</label>
+      <textarea id="gql-query" rows="9" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:'JetBrains Mono',monospace;outline:none;resize:vertical;"></textarea>
+      <label>Variables (JSON)</label>
+      <textarea id="gql-vars" rows="4" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:'JetBrains Mono',monospace;outline:none;resize:vertical;">{}</textarea>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="gqlExecute()">▶ Execute</button>
+        <a class="btn btn-purple" href="/graphiql" target="_blank" style="text-decoration:none;">🔗 Open GraphiQL IDE</a>
+      </div>
+    </div>
+
+    <!-- Right column: Response -->
+    <div class="card">
+      <h3>📨 Response</h3>
+      <div class="status-bar" id="gql-status-bar"></div>
+      <div class="output-box" id="gql-output">Response will appear here…</div>
+    </div>
+  </div>
+
+  <!-- Subscription row -->
+  <div class="grid2" style="margin-top:24px;">
+    <div class="card">
+      <h3>🔄 GraphQL Subscription (WS/WSS)</h3>
+      <label>WebSocket URL</label>
+      <input type="text" id="gql-ws-url" value="ws://localhost:8080/graphql-ws"/>
+      <label>Resource</label>
+      <input type="text" id="gql-sub-resource" value="events"/>
+      <label>Size (KB)</label>
+      <select id="gql-sub-size">
+        <option>1</option><option>2</option><option value="3" selected>3</option>
+        <option>5</option><option>10</option><option>15</option><option>20</option>
+      </select>
+      <label>Format</label>
+      <select id="gql-sub-format"><option value="json">JSON</option><option value="xml">XML</option><option value="text">Plain Text</option><option value="html">HTML</option></select>
+      <label>Interval (ms)</label>
+      <input type="text" id="gql-sub-interval" value="2000"/>
+      <div id="gql-sub-status" style="margin-top:8px; font-size:12px; color:var(--muted);">● Disconnected</div>
+      <div class="btn-group">
+        <button class="btn btn-success" onclick="gqlSubConnect()">Connect &amp; Subscribe</button>
+        <button class="btn btn-danger"  onclick="gqlSubDisconnect()">Unsubscribe</button>
+      </div>
+      <div style="margin-top:12px;padding:10px;background:var(--surface2);border-radius:6px;font-size:11px;color:var(--muted);">
+        Uses the <strong>graphql-ws</strong> protocol over native WebSocket.<br/>
+        For WSS use: <code>wss://localhost:8443/graphql-ws</code>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📋 Subscription Event Log</h3>
+      <div class="ws-log" id="gql-sub-log"><div class="entry"><span class="ts">--:--:--</span><span class="dir-sys">Waiting for connection…</span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═════════════════════ TLS TESTING PANEL ═════════════════════ -->
+<div class="panel" id="panel-tls">
+  <div class="grid2">
+    <!-- Left: probe builder -->
+    <div class="card">
+      <h3>🔒 TLS Version Probe</h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">
+        Each port is configured to accept <strong>only</strong> the listed TLS version(s).
+        The <code>/tls-info</code> endpoint returns the negotiated protocol &amp; cipher.
+      </p>
+
+      <label>TLS Version / Port</label>
+      <select id="tls-port">
+        <option value="8442">TLS 1.2 only — port 8442</option>
+        <option value="8443" selected>TLS 1.3 only — port 8443 (primary)</option>
+        <option value="8444">TLS 1.2 + 1.3 — port 8444</option>
+        <option value="8080">No TLS (plain HTTP) — port 8080</option>
+      </select>
+
+      <label>Custom Endpoint Path</label>
+      <input type="text" id="tls-path" value="/tls-info" placeholder="/tls-info or /api/orders?size=1"/>
+
+      <div class="btn-group" style="margin-top:16px;">
+        <button class="btn btn-primary" onclick="tlsProbe()">▶ Send Request</button>
+        <button class="btn btn-purple"  onclick="tlsProbeAll()">⚡ Probe All Ports</button>
+      </div>
+
+      <!-- Port reference table -->
+      <div style="margin-top:20px;">
+        <h3 style="margin-bottom:10px;">📋 Port Reference</h3>
+        <table class="endpoints-table" style="font-size:12px;">
+          <thead><tr><th>Port</th><th>TLS Version(s)</th><th>Scheme</th></tr></thead>
+            <tr><td><code>8080</code></td><td>None (plain)</td><td>http://</td></tr>
+            <tr><td><code>8442</code></td><td style="color:var(--yellow);">TLS 1.2 only</td><td>https://</td></tr>
+            <tr><td><code>8443</code></td><td style="color:var(--accent2);">TLS 1.3 only ✓</td><td>https://</td></tr>
+            <tr><td><code>8444</code></td><td style="color:var(--accent);">TLS 1.2 + 1.3</td><td>https://</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Right: response viewer -->
+    <div class="card">
+      <h3>📨 TLS Response</h3>
+      <div class="status-bar" id="tls-status-bar"></div>
+      <div class="output-box" id="tls-output">Response will appear here…</div>
+    </div>
+  </div>
+
+  <!-- Probe-all results grid -->
+  <div id="tls-all-grid" style="margin-top:24px;display:none;">
+    <h3 style="color:var(--accent);font-size:14px;margin-bottom:16px;">⚡ All-Port Probe Results</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;" id="tls-all-cards"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════ DOCS PANEL ═══════════════════ -->
+<div class="panel" id="panel-docs">
+  <div class="card" style="margin-bottom:20px;">
+    <h3>📐 Supported Response Sizes</h3>
+    <div class="size-pills" style="margin-top:10px;">
+      <span class="pill">1 KB</span><span class="pill">2 KB</span><span class="pill">3 KB</span>
+      <span class="pill">4 KB</span><span class="pill">5 KB</span><span class="pill">6 KB</span>
+      <span class="pill">7 KB</span><span class="pill">8 KB</span><span class="pill">9 KB</span>
+      <span class="pill">10 KB</span><span class="pill">15 KB</span><span class="pill">20 KB</span>
+    </div>
+  </div>
+
+  <table class="endpoints-table">
+    <thead>
+      <tr><th>Method</th><th>Endpoint</th><th>Description</th><th>Example</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="method m-get">GET</span></td>    <td><code>/api/{resource}</code></td>            <td>List resources</td>       <td><code>?size=5&amp;format=json|xml|text|html</code></td></tr>
+      <tr><td><span class="method m-get">GET</span></td>    <td><code>/api/{resource}/{id}</code></td>         <td>Get single resource</td>  <td><code>?size=10&amp;format=xml</code></td></tr>
+      <tr><td><span class="method m-post">POST</span></td>  <td><code>/api/{resource}</code></td>            <td>Create resource</td>      <td><code>?size=2&amp;format=json</code></td></tr>
+      <tr><td><span class="method m-put">PUT</span></td>    <td><code>/api/{resource}/{id}</code></td>         <td>Update resource</td>      <td><code>?size=3&amp;format=xml</code></td></tr>
+      <tr><td><span class="method m-delete">DELETE</span></td><td><code>/api/{resource}/{id}</code></td>      <td>Delete resource</td>      <td><code>?size=1&amp;format=json</code></td></tr>
+      <tr><td><span class="method m-ws">WS</span></td>      <td><code>ws://localhost:8080/ws</code></td>     <td>STOMP/SockJS WS</td>      <td>Send to <code>/app/mock</code></td></tr>
+      <tr><td><span class="method m-ws">WSS</span></td>     <td><code>wss://localhost:8443/ws</code></td>    <td>STOMP/SockJS WSS</td>     <td>Subscribe <code>/topic/response</code></td></tr>
+      <tr><td><span class="method m-ws">WS</span></td>      <td><code>ws://localhost:8080/raw-ws</code></td> <td>Raw WebSocket</td>        <td>JSON frame in → payload out</td></tr>
+      <tr><td><span class="method m-ws">WSS</span></td>     <td><code>wss://localhost:8443/raw-ws</code></td><td>Raw WebSocket (TLS)</td>  <td>JSON frame in → payload out</td></tr>
+      <tr><td><span class="method m-post">POST</span></td>  <td><code>/graphql</code></td>                  <td>GraphQL Query &amp; Mutation</td> <td><code>{"query":"{ mock(...) { payload } }"}</code></td></tr>
+      <tr><td><span class="method m-get">GET</span></td>    <td><code>/graphiql</code></td>                  <td>GraphiQL Browser IDE</td> <td>Open in browser</td></tr>
+      <tr><td><span class="method m-ws">WS</span></td>      <td><code>ws://localhost:8080/graphql-ws</code></td> <td>GraphQL Subscription WS</td>  <td>graphql-ws protocol</td></tr>
+      <tr><td><span class="method m-ws">WSS</span></td>     <td><code>wss://localhost:8443/graphql-ws</code></td><td>GraphQL Subscription WSS</td> <td>graphql-ws protocol</td></tr>
+      <tr><td><span class="method m-get">GET</span></td>    <td><code>/tls-info</code></td>               <td>TLS session info</td>      <td><code>https://localhost:8442..8444/tls-info</code></td></tr>
+      <tr><td><span class="method m-get">GET</span></td>    <td><code>/health</code></td>                    <td>Health probe</td>         <td>—</td></tr>
+      <tr><td><span class="method m-get">GET</span></td>    <td><code>/info</code></td>                      <td>Server info &amp; examples</td><td>—</td></tr>
+    </tbody>
+  </table>
+
+  <div class="card" style="margin-top:20px;">
+    <h3>📦 Raw WebSocket Frame Format</h3>
+    <pre style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#e6edf3;margin-top:8px;">{
+  "size":     5,
+  "format":   "json",
+  "method":   "GET",
+  "resource": "orders"
+}</pre>
+  </div>
+</div>
+
+<!-- SockJS + STOMP from CDN -->
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+<script>
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab,.panel').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+// ── REST ──────────────────────────────────────────────────────────────────────
+async function sendRest(methodOverride) {
+  const method   = methodOverride || document.getElementById('rest-method').value;
+  const resource = document.getElementById('rest-resource').value.trim() || 'orders';
+  const id       = document.getElementById('rest-id').value.trim();
+  const size     = document.getElementById('rest-size').value;
+  const format   = document.getElementById('rest-format').value;
+
+  let url = `/api/${resource}`;
+  if ((method === 'PUT' || method === 'DELETE' || method === 'GET') && id) url += `/${id}`;
+  url += `?size=${size}&format=${format}`;
+
+  const out     = document.getElementById('rest-output');
+  const statBar = document.getElementById('rest-status-bar');
+  out.textContent = '⏳ Loading…';
+  statBar.innerHTML = '';
+  const t0 = Date.now();
+
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': format === 'xml' ? 'application/xml' : 'application/json' },
+      body: (method === 'POST' || method === 'PUT') ? JSON.stringify({ mock: true }) : undefined
+    });
+    const text = await res.text();
+    const ms   = Date.now() - t0;
+    const bytes = new TextEncoder().encode(text).length;
+
+    statBar.innerHTML = `
+      <span class="badge badge-${res.ok ? 'green' : 'red'}">${res.status}</span>
+      <span class="badge badge-blue">${method}</span>
+      <span class="badge badge-yellow">${(bytes/1024).toFixed(2)} KB</span>
+      <span class="badge" style="background:rgba(139,148,158,.15);color:var(--muted)">${ms} ms</span>
+    `;
+    out.textContent = text;
+  } catch(e) {
+    statBar.innerHTML = `<span class="badge badge-red">ERROR</span>`;
+    out.textContent = 'Error: ' + e.message;
+  }
+}
+
+// ── STOMP ─────────────────────────────────────────────────────────────────────
+let stompClient = null;
+function stompLog(dir, msg) {
+  const log  = document.getElementById('stomp-log');
+  const ts   = new Date().toLocaleTimeString();
+  const div  = document.createElement('div');
+  div.className = 'entry';
+  const preview = typeof msg === 'string' && msg.length > 200 ? msg.slice(0,200) + '…' : msg;
+  div.innerHTML = `<span class="ts">${ts}</span><span class="dir-${dir}">[${dir.toUpperCase()}] ${escHtml(String(preview))}</span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function stompConnect() {
+  const url = document.getElementById('stomp-url').value.trim();
+  stompLog('sys', 'Connecting to ' + url + ' …');
+  const sock = new SockJS(url);
+  stompClient = Stomp.over(sock);
+  stompClient.debug = null;
+  stompClient.connect({}, () => {
+    stompLog('sys', '✅ Connected!');
+    stompClient.subscribe('/topic/response', msg => {
+      const bytes = new TextEncoder().encode(msg.body).length;
+      stompLog('recv', `[${(bytes/1024).toFixed(2)} KB] ` + msg.body.slice(0, 300) + (msg.body.length > 300 ? '…' : ''));
+    });
+  }, err => stompLog('err', 'Error: ' + err));
+}
+function stompDisconnect() {
+  if (stompClient) { stompClient.disconnect(); stompLog('sys', '🔌 Disconnected'); stompClient = null; }
+}
+function stompSend() {
+  if (!stompClient) { stompLog('err', 'Not connected!'); return; }
+  const payload = {
+    size:     parseInt(document.getElementById('stomp-size').value),
+    format:   document.getElementById('stomp-format').value,
+    method:   document.getElementById('stomp-method').value,
+    resource: document.getElementById('stomp-resource').value
+  };
+  stompLog('send', JSON.stringify(payload));
+  stompClient.send('/app/mock', {}, JSON.stringify(payload));
+}
+
+// ── Raw WebSocket ─────────────────────────────────────────────────────────────
+let rawWs = null;
+function rawLog(dir, msg) {
+  const log = document.getElementById('raw-log');
+  const ts  = new Date().toLocaleTimeString();
+  const div = document.createElement('div');
+  div.className = 'entry';
+  const preview = typeof msg === 'string' && msg.length > 200 ? msg.slice(0,200) + '…' : msg;
+  div.innerHTML = `<span class="ts">${ts}</span><span class="dir-${dir}">[${dir.toUpperCase()}] ${escHtml(String(preview))}</span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+function rawConnect() {
+  const url = document.getElementById('raw-url').value.trim();
+  rawLog('sys', 'Connecting to ' + url + ' …');
+  rawWs = new WebSocket(url);
+  rawWs.onopen  = () => { rawLog('sys', '✅ Connected!'); document.getElementById('raw-conn-status').textContent = '● Connected'; document.getElementById('raw-conn-status').style.color='var(--accent2)'; };
+  rawWs.onclose = () => { rawLog('sys', '🔌 Closed');    document.getElementById('raw-conn-status').textContent = '● Disconnected'; document.getElementById('raw-conn-status').style.color='var(--muted)'; };
+  rawWs.onerror = e  => rawLog('err', 'WebSocket error');
+  rawWs.onmessage = e => {
+    const bytes = new TextEncoder().encode(e.data).length;
+    rawLog('recv', `[${(bytes/1024).toFixed(2)} KB] ` + e.data.slice(0, 300) + (e.data.length > 300 ? '…' : ''));
+  };
+}
+function rawDisconnect() {
+  if (rawWs) { rawWs.close(); rawWs = null; }
+}
+function rawSend() {
+  if (!rawWs || rawWs.readyState !== 1) { rawLog('err', 'Not connected!'); return; }
+  const payload = {
+    size:     parseInt(document.getElementById('raw-size').value),
+    format:   document.getElementById('raw-format').value,
+    method:   document.getElementById('raw-method').value,
+    resource: document.getElementById('raw-resource').value
+  };
+  const msg = JSON.stringify(payload);
+  rawLog('send', msg);
+  rawWs.send(msg);
+}
+
+// ── GraphQL HTTP (Query / Mutation) ───────────────────────────────────────────
+const GQL_TEMPLATES = {
+  'query-mock': {
+    q: `query GetMock($resource: String!, $size: Int, $format: String) {\n  mock(resource: $resource, size: $size, format: $format) {\n    requestId method resource sizeKb format byteLength timestamp\n    payload\n  }\n}`,
+    v: `{ "resource": "orders", "size": 5, "format": "json" }`
+  },
+  'query-health': { q: `query { health { status server timestamp } }`, v: `{}` },
+  'query-info':   { q: `query { info { server validSizes formats methods httpEndpoint graphiqlUrl wsSubscriptionUrl } }`, v: `{}` },
+  'mutation-create': {
+    q: `mutation Create($resource: String!, $size: Int, $format: String) {\n  create(resource: $resource, size: $size, format: $format) {\n    success operation affectedId\n    response { sizeKb byteLength timestamp }\n  }\n}`,
+    v: `{ "resource": "users", "size": 2, "format": "json" }`
+  },
+  'mutation-update': {
+    q: `mutation Update($resource: String!, $id: String!, $size: Int) {\n  update(resource: $resource, id: $id, size: $size) {\n    success operation affectedId\n    response { sizeKb byteLength }\n  }\n}`,
+    v: `{ "resource": "users", "id": "42", "size": 3 }`
+  },
+  'mutation-delete': {
+    q: `mutation Delete($resource: String!, $id: String!, $size: Int) {\n  delete(resource: $resource, id: $id, size: $size) {\n    success operation affectedId\n    response { sizeKb byteLength }\n  }\n}`,
+    v: `{ "resource": "products", "id": "99", "size": 1 }`
+  }
+};
+
+function gqlTemplateChange() {
+  const t = GQL_TEMPLATES[document.getElementById('gql-op-type').value];
+  if (t) {
+    document.getElementById('gql-query').value = t.q;
+    document.getElementById('gql-vars').value  = t.v;
+  }
+}
+gqlTemplateChange();
+
+async function gqlExecute() {
+  const query = document.getElementById('gql-query').value.trim();
+  let variables = {};
+  try { variables = JSON.parse(document.getElementById('gql-vars').value || '{}'); } catch(e) {}
+  const out = document.getElementById('gql-output');
+  const statBar = document.getElementById('gql-status-bar');
+  out.textContent = '⏳ Executing…';
+  statBar.innerHTML = '';
+  const t0 = Date.now();
+  try {
+    const res  = await fetch('/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables })
+    });
+    const json = await res.json();
+    const text = JSON.stringify(json, null, 2);
+    const ms   = Date.now() - t0;
+    const bytes = new TextEncoder().encode(text).length;
+    const hasErr = json.errors && json.errors.length;
+    statBar.innerHTML = `
+      <span class="badge badge-${res.ok && !hasErr ? 'green' : 'red'}">${res.status}${hasErr ? ' (GraphQL Error)' : ''}</span>
+      <span class="badge badge-blue">GraphQL</span>
+      <span class="badge badge-yellow">${(bytes/1024).toFixed(2)} KB</span>
+      <span class="badge" style="background:rgba(139,148,158,.15);color:var(--muted)">${ms} ms</span>
+    `;
+    out.textContent = text;
+  } catch(e) {
+    statBar.innerHTML = `<span class="badge badge-red">ERROR</span>`;
+    out.textContent = 'Error: ' + e.message;
+  }
+}
+
+// ── GraphQL Subscription (graphql-ws protocol over raw WebSocket) ─────────────
+let gqlSubWs = null, gqlSubId = 1;
+
+function gqlSubLog(dir, msg) {
+  const log = document.getElementById('gql-sub-log');
+  const ts  = new Date().toLocaleTimeString();
+  const div = document.createElement('div');
+  div.className = 'entry';
+  const preview = typeof msg === 'string' && msg.length > 220 ? msg.slice(0, 220) + '…' : msg;
+  div.innerHTML = `<span class="ts">${ts}</span><span class="dir-${dir}">[${dir.toUpperCase()}] ${escHtml(String(preview))}</span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function gqlSubConnect() {
+  if (gqlSubWs) gqlSubWs.close();
+  const url      = document.getElementById('gql-ws-url').value.trim();
+  const resource = document.getElementById('gql-sub-resource').value.trim();
+  const size     = parseInt(document.getElementById('gql-sub-size').value);
+  const format   = document.getElementById('gql-sub-format').value;
+  const interval = parseInt(document.getElementById('gql-sub-interval').value) || 2000;
+  gqlSubLog('sys', 'Connecting to ' + url + ' …');
+  gqlSubWs = new WebSocket(url, 'graphql-ws');
+  gqlSubWs.onopen = () => {
+    gqlSubLog('sys', '✅ Connected — sending connection_init');
+    document.getElementById('gql-sub-status').textContent = '● Connected';
+    document.getElementById('gql-sub-status').style.color = 'var(--accent2)';
+    gqlSubWs.send(JSON.stringify({ type: 'connection_init', payload: {} }));
+  };
+  gqlSubWs.onmessage = e => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'connection_ack') {
+        gqlSubLog('sys', '🤝 connection_ack — subscribing');
+        const subQ = `subscription S($resource:String!,$size:Int,$format:String,$intervalMs:Int){
+  mockStream(resource:$resource,size:$size,format:$format,intervalMs:$intervalMs){
+    requestId sizeKb byteLength timestamp payload
+  }
+}`;
+        gqlSubWs.send(JSON.stringify({ id: String(gqlSubId++), type: 'subscribe',
+          payload: { query: subQ, variables: { resource, size, format, intervalMs: interval } }
+        }));
+      } else if (msg.type === 'next' && msg.payload) {
+        const d = msg.payload.data && msg.payload.data.mockStream;
+        if (d) {
+          gqlSubLog('recv', `[${d.sizeKb}KB / ${d.byteLength}B] ${d.timestamp} — ${(d.payload||'').slice(0,100)}…`);
+        } else {
+          gqlSubLog('recv', JSON.stringify(msg.payload).slice(0, 200));
+        }
+      } else if (msg.type === 'error') {
+        gqlSubLog('err', JSON.stringify(msg.payload));
+      } else if (msg.type === 'complete') {
+        gqlSubLog('sys', '✅ Subscription completed');
+      } else {
+        gqlSubLog('sys', 'frame type: ' + msg.type);
+      }
+    } catch(err) { gqlSubLog('recv', e.data.slice(0, 200)); }
+  };
+  gqlSubWs.onerror = () => gqlSubLog('err', 'WebSocket error');
+  gqlSubWs.onclose = () => {
+    gqlSubLog('sys', '🔌 Closed');
+    document.getElementById('gql-sub-status').textContent = '● Disconnected';
+    document.getElementById('gql-sub-status').style.color = 'var(--muted)';
+  };
+}
+
+function gqlSubDisconnect() {
+  if (gqlSubWs) { gqlSubWs.close(); gqlSubWs = null; }
+}
+
+// ── TLS Testing ───────────────────────────────────────────────────────────────
+async function tlsProbe() {
+  const port   = document.getElementById('tls-port').value;
+  const path   = document.getElementById('tls-path').value.trim() || '/tls-info';
+  const scheme = port === '8080' ? 'http' : 'https';
+  const url    = `${scheme}://localhost:${port}${path}`;
+
+  const out     = document.getElementById('tls-output');
+  const statBar = document.getElementById('tls-status-bar');
+  out.textContent = `⏳ Probing ${url} …`;
+  statBar.innerHTML = '';
+  const t0 = Date.now();
+
+  try {
+    const res  = await fetch(url);
+    const text = await res.text();
+    const ms   = Date.now() - t0;
+    let displayText = text;
+    try { displayText = JSON.stringify(JSON.parse(text), null, 2); } catch(e) {}
+
+    // extract negotiated protocol for badge
+    let proto = 'HTTPS';
+    try { proto = JSON.parse(text).negotiatedProtocol || 'HTTPS'; } catch(e) {}
+
+    const badgeColor = proto.includes('1.3') ? 'green' : proto.includes('1.2') ? 'blue' :
+                       proto.includes('none') ? 'red' : 'blue';
+    statBar.innerHTML = `
+      <span class="badge badge-${res.ok ? 'green' : 'red'}">${res.status}</span>
+      <span class="badge badge-${badgeColor}">${proto}</span>
+      <span class="badge" style="background:rgba(139,148,158,.15);color:var(--muted)">port ${port}</span>
+      <span class="badge" style="background:rgba(139,148,158,.15);color:var(--muted)">${ms} ms</span>
+    `;
+    out.textContent = displayText;
+  } catch(e) {
+    statBar.innerHTML = `<span class="badge badge-red">ERROR</span><span class="badge badge-yellow">port ${port}</span>`;
+    out.textContent = `Error: ${e.message}\n\nNote: Browser fetch() cannot reach ports that negotiate a TLS version\nyour browser's TLS stack rejects. Use curl or Postman\nfor older TLS versions:\n  curl --tls-max 1.2 --tlsv1.2 -k https://localhost:8442/tls-info\n  curl --tls-max 1.3 --tlsv1.3 -k https://localhost:8443/tls-info`;
+  }
+}
+
+async function tlsProbeAll() {
+  const ports = [
+    { port: '8080', label: 'No TLS', scheme: 'http'  },
+    { port: '8442', label: 'TLS 1.2', scheme: 'https' },
+    { port: '8443', label: 'TLS 1.3', scheme: 'https' },
+    { port: '8444', label: 'TLS 1.2+1.3', scheme: 'https' }
+  ];
+  const path = document.getElementById('tls-path').value.trim() || '/tls-info';
+  const grid = document.getElementById('tls-all-grid');
+  const cards = document.getElementById('tls-all-cards');
+  grid.style.display = 'block';
+  cards.innerHTML = ports.map(p => `
+    <div class="card" id="tls-card-${p.port}" style="font-size:12px;">
+      <div style="font-weight:600;color:var(--accent);margin-bottom:6px;">${p.label} <span style="color:var(--muted)">:${p.port}</span></div>
+      <div style="color:var(--muted);">⏳ probing…</div>
+    </div>`).join('');
+
+  await Promise.allSettled(ports.map(async p => {
+    const url = `${p.scheme}://localhost:${p.port}${path}`;
+    const card = document.getElementById(`tls-card-${p.port}`);
+    try {
+      const t0  = Date.now();
+      const res = await fetch(url);
+      const ms  = Date.now() - t0;
+      let proto = p.port === '8080' ? 'none (plain HTTP)' : 'unknown';
+      try { proto = JSON.parse(await res.clone().text()).negotiatedProtocol || proto; } catch(e){}
+      const col = proto.includes('1.3') ? 'var(--accent2)' : proto.includes('1.2') ? 'var(--accent)' : 'var(--muted)';
+      card.innerHTML = `
+        <div style="font-weight:600;color:var(--accent);margin-bottom:6px;">${p.label} <span style="color:var(--muted)">:${p.port}</span></div>
+        <div style="color:${col};font-weight:600;">${proto}</div>
+        <div style="color:var(--muted);margin-top:4px;">HTTP ${res.status} · ${ms} ms</div>`;
+    } catch(e) {
+      card.innerHTML = `
+        <div style="font-weight:600;color:var(--accent);margin-bottom:6px;">${p.label} <span style="color:var(--muted)">:${p.port}</span></div>
+        <div style="color:var(--warn);">✗ ${e.message.slice(0,60)}</div>
+        <div style="color:var(--muted);margin-top:4px;font-size:11px;">Failed to connect</div>`;
+    }
+  }));
+}
+</script>
+</body>
+</html>
