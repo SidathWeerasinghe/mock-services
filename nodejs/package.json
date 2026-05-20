@@ -1,0 +1,18 @@
+{
+  "name": "mock-api-server-node",
+  "version": "1.0.0",
+  "description": "Mock API Server (Node.js) — same endpoints as Java/Python/Go",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}
